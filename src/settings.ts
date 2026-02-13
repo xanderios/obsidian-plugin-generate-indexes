@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import HelloWorldPlugin from "./main";
 import { FolderSuggest } from "./ui/folderSuggest";
 
@@ -85,27 +85,29 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 						this.plugin.settings.ignoredFolders.push(value);
 						await this.plugin.saveSettings();
 						inputEl.value = "";
-						this.display(); // Refresh to show new folder
+						this.display();
 					}
-				}))
+				}));
 
-		// List of ignored folders with remove buttons
-		const listContainer = containerEl.createDiv("ignored-folders-list");
-		for (const folder of this.plugin.settings.ignoredFolders) {
-			const folderEl = listContainer.createDiv("ignored-folder-item");
-			folderEl.createSpan({ text: folder, cls: "ignored-folder-name" });
-			
-			const removeBtn = folderEl.createEl("button", { 
-				text: "Remove", 
-				cls: "ignored-folder-remove" 
-			});
-			removeBtn.addEventListener("click", () => {
-				this.plugin.settings.ignoredFolders = 
-					this.plugin.settings.ignoredFolders.filter(f => f !== folder);
-				void this.plugin.saveSettings().then(() => {
-					this.display();
+		// Folder list below the setting
+		if (this.plugin.settings.ignoredFolders.length > 0) {
+			const listContainer = containerEl.createDiv("ignored-folders-list");
+			for (const folder of this.plugin.settings.ignoredFolders) {
+				const folderEl = listContainer.createDiv("ignored-folder-item");
+				folderEl.createSpan({ text: folder, cls: "ignored-folder-name" });
+				
+				const removeBtn = folderEl.createEl("button", { 
+					cls: "ignored-folder-remove clickable-icon" 
 				});
-			});
+				setIcon(removeBtn, "trash-2");
+				removeBtn.addEventListener("click", () => {
+					this.plugin.settings.ignoredFolders = 
+						this.plugin.settings.ignoredFolders.filter(f => f !== folder);
+					void this.plugin.saveSettings().then(() => {
+						this.display();
+					});
+				});
+			}
 		}
 	}
 }
