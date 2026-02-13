@@ -1,99 +1,180 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Editor, MarkdownView, Notice, Plugin, TFile } from "obsidian";
+import { DEFAULT_SETTINGS, HelloWorldPluginSettings, HelloWorldPluginSettingTab } from "./settings";
+import { HelloWorldModal } from "./ui/modal";
+import { 
+	getIndexFiles, 
+	getSiblingFiles, 
+	getNestedIndexFiles, 
+	generateListContent
+} from "./utils/indexGenerator";
+import { 
+	extractMarkedSection, 
+	replaceMarkedSection, 
+	computeContentHash,
+	getParentPath
+} from "./utils/fileUtils";
 
-// Remember to rename these classes and interfaces!
+export default class HelloWorldPlugin extends Plugin {
+	settings: HelloWorldPluginSettings;
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+	/**
+	 * Update a single index file.
+	 * Returns true if the file was updated, false if unchanged.
+	 */
+	private async updateIndexFile(indexFile: TFile): Promise<boolean> {
+		const prefix = this.settings.indexPrefix;
+		const sortOrder = this.settings.sortOrder ?? "asc";
+		const displayFormat = this.settings.indexDisplayFormat ?? "📁 {name}";
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
 
-	async onload() {
+		// Gather files for this index
+		const siblings = getSiblingFiles(this.app.vault, indexFile, prefix, ignoredFolders);
+		const nestedIndexes = getNestedIndexFiles(this.app.vault, indexFile, prefix, ignoredFolders);
+
+		// Generate new list content
+		const newListContent = generateListContent(
+			siblings, 
+			nestedIndexes, 
+			sortOrder, 
+			prefix, 
+			displayFormat
+		);
+		const newHash = computeContentHash(newListContent);
+
+		// Read current file content
+		const currentContent = await this.app.vault.read(indexFile);
+
+		// Extract existing marked section and compare
+		const existingSection = extractMarkedSection(currentContent);
+		const existingHash = existingSection ? computeContentHash(existingSection) : null;
+
+		// Only update if content changed
+		if (existingHash !== newHash) {
+			const updatedContent = replaceMarkedSection(currentContent, newListContent);
+			await this.app.vault.modify(indexFile, updatedContent);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Generate indexes for all index files in the vault.
+	 */
+	async generateIndexesForVault(): Promise<void> {
+		const prefix = this.settings.indexPrefix;
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		const indexFiles = getIndexFiles(this.app.vault, prefix, ignoredFolders);
+
+		if (indexFiles.length === 0) {
+			new Notice(`No index files found with prefix "${prefix}"`);
+			return;
+		}
+
+		let updatedCount = 0;
+		for (const indexFile of indexFiles) {
+			if (await this.updateIndexFile(indexFile)) {
+				updatedCount++;
+			}
+		}
+
+		if (updatedCount > 0) {
+			new Notice(`Updated ${updatedCount} index file${updatedCount > 1 ? "s" : ""}`);
+		} else {
+			new Notice("All index files are up to date");
+		}
+	}
+
+	/**
+	 * Generate index for the current folder (based on active file).
+	 */
+	async generateIndexForCurrentFolder(): Promise<void> {
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const prefix = this.settings.indexPrefix;
+		const currentFolder = getParentPath(activeFile);
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+
+		// Find index file in current folder
+		const indexFiles = getIndexFiles(this.app.vault, prefix, ignoredFolders);
+		const indexInFolder = indexFiles.find(f => getParentPath(f) === currentFolder);
+
+		if (!indexInFolder) {
+			new Notice(`No index file found in current folder with prefix "${prefix}"`);
+			return;
+		}
+
+		if (await this.updateIndexFile(indexInFolder)) {
+			new Notice(`Updated ${indexInFolder.name}`);
+		} else {
+			new Notice(`${indexInFolder.name} is up to date`);
+		}
+	}
+
+	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		// Ribbon icon to generate indexes for entire vault
+		this.addRibbonIcon("list-ordered", "Generate indexes", () => {
+			void this.generateIndexesForVault();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
+		// Command: generate indexes for entire vault
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
+			id: "generate-indexes-vault",
+			name: "Generate indexes for entire vault",
 			callback: () => {
-				new SampleModal(this.app).open();
+				void this.generateIndexesForVault();
 			}
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
+
+		// Command: generate index for current folder
 		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
+			id: "generate-indexes-folder",
+			name: "Generate indexes for current folder",
+			callback: () => {
+				void this.generateIndexForCurrentFolder();
+			}
+		});
+
+		// Example modal command
+		this.addCommand({
+			id: "open-modal-simple",
+			name: "Open modal (simple)",
+			callback: () => {
+				new HelloWorldModal(this.app).open();
+			}
+		});
+
+		// Example editor command
+		this.addCommand({
+			id: "replace-selected",
+			name: "Replace selected content",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
+				editor.replaceSelection("Sample editor command");
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		// Settings tab
+		this.addSettingTab(new HelloWorldPluginSettingTab(this.app, this));
 	}
 
-	onunload() {
+	onunload(): void {
+		// Cleanup handled automatically by Obsidian for registered items
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+	async loadSettings(): Promise<void> {
+		const loadedData = await this.loadData() as Partial<HelloWorldPluginSettings> | null;
+		this.settings = {
+			...DEFAULT_SETTINGS,
+			...loadedData
+		};
 	}
 
-	async saveSettings() {
+	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
 	}
 }

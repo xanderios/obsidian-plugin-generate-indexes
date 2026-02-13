@@ -1,8 +1,45 @@
 /*
-
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
+  Styles for the Index Generator plugin settings
 */
+
+/* Ignored folders list */
+.ignored-folders-list {
+	margin-top: 8px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	background: none;
+	border-radius: var(--radius-xl);
+}
+
+.ignored-folder-item {
+	display: flex;
+	width: 100%;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	padding: var(--size-4-3) var(--size-4-3);
+	background: var(--background-secondary);
+	border-radius: var(--radius-l);
+	font-size: 13px;
+}
+
+.ignored-folder-name {
+	color: var(--text-normal);
+}
+
+.ignored-folder-remove {
+	background: none;
+	border: none;
+	border-radius: var(--button-radius);
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0 16px;
+	font-size: 12px;
+	line-height: 1;
+	box-shadow: none;
+}
+
+.ignored-folder-remove:hover {
+	color: var(--text-error);
+}
