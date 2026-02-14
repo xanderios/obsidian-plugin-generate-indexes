@@ -1,5 +1,7 @@
 import { TFile, TFolder, Vault } from "obsidian";
 
+const INDEX_START_MARKER = "%% INDEX STARTS HERE %%";
+const INDEX_END_MARKER = "%% INDEX ENDS HERE %%";
 const CONTENTS_HEADING = "## Contents";
 
 /**
@@ -26,60 +28,46 @@ export function getImmediateSubfolders(vault: Vault, folderPath: string): TFolde
 }
 
 /**
- * Format the contents section with heading.
+ * Format the contents section with markers and heading.
  */
 export function formatContentsSection(content: string): string {
-	return `${CONTENTS_HEADING}\n\n${content}`;
+	return `${INDEX_START_MARKER}\n${CONTENTS_HEADING}\n\n${content}\n${INDEX_END_MARKER}`;
 }
 
 /**
- * Find the end of the Contents section (next heading or EOF).
- */
-function findSectionEnd(fileContent: string, startAfterHeading: number): number {
-	// Look for the next heading (any level) after the Contents heading
-	const nextHeadingMatch = fileContent.substring(startAfterHeading).match(/\n(#{1,6}\s)/);
-	if (nextHeadingMatch?.index !== undefined) {
-		return startAfterHeading + nextHeadingMatch.index;
-	}
-	return fileContent.length;
-}
-
-/**
- * Extract the content under ## Contents heading, if present.
- * Returns null if no Contents heading found.
+ * Extract the content between index markers, if present.
+ * Returns null if no markers found.
  */
 export function extractMarkedSection(fileContent: string): string | null {
-	const headingIdx = fileContent.indexOf(CONTENTS_HEADING);
-	if (headingIdx === -1) {
+	const startIdx = fileContent.indexOf(INDEX_START_MARKER);
+	const endIdx = fileContent.indexOf(INDEX_END_MARKER);
+
+	if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
 		return null;
 	}
 
-	const contentStart = headingIdx + CONTENTS_HEADING.length;
-	const sectionEnd = findSectionEnd(fileContent, contentStart);
-
-	return fileContent.substring(contentStart, sectionEnd).trim();
+	const contentStart = startIdx + INDEX_START_MARKER.length;
+	return fileContent.substring(contentStart, endIdx).trim();
 }
 
 /**
- * Replace the Contents section with new content.
- * If no Contents heading exists, append the section.
+ * Replace the marked section with new content.
+ * If no markers exist, append the section.
  */
 export function replaceMarkedSection(fileContent: string, newListContent: string): string {
 	const formatted = formatContentsSection(newListContent);
-	const headingIdx = fileContent.indexOf(CONTENTS_HEADING);
+	const startIdx = fileContent.indexOf(INDEX_START_MARKER);
+	const endIdx = fileContent.indexOf(INDEX_END_MARKER);
 
-	if (headingIdx === -1) {
-		// No existing Contents section - append
+	if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+		// No existing markers - append
 		const trimmed = fileContent.trimEnd();
 		return trimmed.length > 0 ? `${trimmed}\n\n${formatted}` : formatted;
 	}
 
-	// Replace existing section
-	const contentStart = headingIdx + CONTENTS_HEADING.length;
-	const sectionEnd = findSectionEnd(fileContent, contentStart);
-
-	const before = fileContent.substring(0, headingIdx);
-	const after = fileContent.substring(sectionEnd);
+	// Replace existing section (including both markers)
+	const before = fileContent.substring(0, startIdx);
+	const after = fileContent.substring(endIdx + INDEX_END_MARKER.length);
 	return `${before}${formatted}${after}`;
 }
 

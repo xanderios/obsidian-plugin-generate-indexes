@@ -25,6 +25,7 @@ export default class HelloWorldPlugin extends Plugin {
 		const prefix = this.settings.indexPrefix;
 		const sortOrder = this.settings.sortOrder ?? "asc";
 		const displayFormat = this.settings.indexDisplayFormat ?? "📁 {name}";
+		const stripPrefix = this.settings.stripPrefix ?? true;
 		const ignoredFolders = this.settings.ignoredFolders ?? [];
 
 		// Gather files for this index
@@ -37,7 +38,8 @@ export default class HelloWorldPlugin extends Plugin {
 			nestedIndexes, 
 			sortOrder, 
 			prefix, 
-			displayFormat
+			displayFormat,
+			stripPrefix
 		);
 		const newHash = computeContentHash(newListContent);
 

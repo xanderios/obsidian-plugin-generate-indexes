@@ -95,13 +95,16 @@ export function getNestedIndexFiles(
 function formatIndexDisplayName(
 	file: TFile, 
 	prefix: string, 
-	displayFormat: string
+	displayFormat: string,
+	stripPrefix: boolean
 ): string {
-	// Extract name without prefix (e.g., "Index - Projects" → "Projects")
-	const nameWithoutPrefix = file.basename.startsWith(prefix) 
-		? file.basename.slice(prefix.length) 
-		: file.basename;
-	return displayFormat.replace("{name}", nameWithoutPrefix);
+	let name = file.basename;
+	if (stripPrefix && name.startsWith(prefix)) {
+		name = name.slice(prefix.length);
+		// Fallback if stripping leaves empty
+		if (name.length === 0) name = file.basename;
+	}
+	return displayFormat.replace("{name}", name);
 }
 
 /**
@@ -123,7 +126,8 @@ export function generateListContent(
 	nestedIndexes: TFile[],
 	sortOrder: SortOrder,
 	indexPrefix: string,
-	indexDisplayFormat: string
+	indexDisplayFormat: string,
+	stripPrefix: boolean
 ): string {
 	// Sort each group separately
 	const sortedNested = sortFiles(nestedIndexes, sortOrder);
@@ -142,7 +146,7 @@ export function generateListContent(
 		
 		if (isNested) {
 			// Use alias for nested indexes: [[Index - Projects|📁 Projects]]
-			const displayName = formatIndexDisplayName(file, indexPrefix, indexDisplayFormat);
+			const displayName = formatIndexDisplayName(file, indexPrefix, indexDisplayFormat, stripPrefix);
 			return `${index + 1}. [[${linkTarget}|${displayName}]]`;
 		} else {
 			return `${index + 1}. [[${linkTarget}]]`;

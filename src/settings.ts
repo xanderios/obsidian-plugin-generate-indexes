@@ -7,6 +7,7 @@ export type SortOrder = "asc" | "desc";
 export interface HelloWorldPluginSettings {
 	indexPrefix: string;
 	indexDisplayFormat: string;
+	stripPrefix: boolean;
 	sortOrder: SortOrder;
 	ignoredFolders: string[];
 }
@@ -14,6 +15,7 @@ export interface HelloWorldPluginSettings {
 export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
 	indexPrefix: "Index - ",
 	indexDisplayFormat: "📁 {name}",
+	stripPrefix: true,
 	sortOrder: "asc",
 	ignoredFolders: []
 };
@@ -44,12 +46,22 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Index display format")
-			.setDesc("How nested index links appear. Use {name} for the index name without prefix.")
+			.setDesc("How nested index links appear. Use {name} for the index name.")
 			.addText(text => text
 				.setPlaceholder("📁 {name}")
 				.setValue(this.plugin.settings.indexDisplayFormat)
 				.onChange(async (value) => {
 					this.plugin.settings.indexDisplayFormat = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Strip prefix")
+			.setDesc("Remove the index prefix from nested index display names")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.stripPrefix)
+				.onChange(async (value) => {
+					this.plugin.settings.stripPrefix = value;
 					await this.plugin.saveSettings();
 				}));
 
