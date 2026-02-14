@@ -1,5 +1,5 @@
 import { Editor, MarkdownView, Notice, Plugin, TFile } from "obsidian";
-import { DEFAULT_SETTINGS, HelloWorldPluginSettings, HelloWorldPluginSettingTab } from "./settings";
+import { DEFAULT_SETTINGS, HelloWorldPluginSettings, HelloWorldPluginSettingTab, FrontmatterAttribute } from "./settings";
 import { HelloWorldModal } from "./ui/modal";
 import { 
 	getIndexFiles, 
@@ -18,9 +18,35 @@ export default class HelloWorldPlugin extends Plugin {
 	settings: HelloWorldPluginSettings;
 
 	/**
-	 * Update a single index file.
-	 * Returns true if the file was updated, false if unchanged.
+	 * Inject/update YAML frontmatter attributes in a markdown file.
 	 */
+	private injectFrontmatter(content: string, attributes: FrontmatterAttribute[]): string {
+		if (attributes.length === 0) return content;
+		const yamlRegex = /^---\n([\s\S]*?)\n---\n?/;
+		let yamlBlock = "";
+		let rest = content;
+		let yamlObj: Record<string, string> = {};
+
+		const match = content.match(yamlRegex);
+		if (match && match[1]) {
+			yamlBlock = match[1];
+			rest = content.slice(match[0].length);
+			for (const line of yamlBlock.split("\n")) {
+				const [k, ...v] = line.split(":");
+				if (k && v.length) yamlObj[k.trim()] = v.join(":").trim();
+			}
+		}
+
+		for (const attr of attributes) {
+			yamlObj[attr.key] = attr.value;
+		}
+
+		const newYaml = Object.entries(yamlObj)
+			.map(([k, v]) => `${k}: ${v}`)
+			.join("\n");
+		return `---\n${newYaml}\n---\n${rest}`;
+	}
+
 	private async updateIndexFile(indexFile: TFile): Promise<boolean> {
 		const identifierPattern = this.settings.indexIdentifier;
 		const sortEnabled = this.settings.sortEnabled ?? true;
@@ -28,6 +54,7 @@ export default class HelloWorldPlugin extends Plugin {
 		const displayFormat = this.settings.indexDisplayFormat ?? "📁 {name}";
 		const displayStripPattern = this.settings.displayStripPattern ?? "";
 		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		const frontmatterAttributes = this.settings.frontmatterAttributes ?? [];
 
 		// Gather files for this index
 		const siblings = getSiblingFiles(this.app.vault, indexFile, identifierPattern, ignoredFolders);
@@ -45,7 +72,10 @@ export default class HelloWorldPlugin extends Plugin {
 		const newHash = computeContentHash(newListContent);
 
 		// Read current file content
-		const currentContent = await this.app.vault.read(indexFile);
+		let currentContent = await this.app.vault.read(indexFile);
+
+		// Inject/update frontmatter
+		currentContent = this.injectFrontmatter(currentContent, frontmatterAttributes);
 
 		// Extract existing marked section and compare
 		const existingSection = extractMarkedSection(currentContent);

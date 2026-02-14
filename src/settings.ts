@@ -4,6 +4,11 @@ import { FolderSuggest } from "./ui/folderSuggest";
 
 export type SortOrder = "asc" | "desc";
 
+export interface FrontmatterAttribute {
+	key: string;
+	value: string;
+}
+
 export interface HelloWorldPluginSettings {
 	indexIdentifier: string;
 	indexDisplayFormat: string;
@@ -11,6 +16,7 @@ export interface HelloWorldPluginSettings {
 	sortEnabled: boolean;
 	sortOrder: SortOrder;
 	ignoredFolders: string[];
+	frontmatterAttributes: FrontmatterAttribute[];
 }
 
 export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
@@ -19,7 +25,8 @@ export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
 	displayStripPattern: "^\\d{2} - ",
 	sortEnabled: true,
 	sortOrder: "asc",
-	ignoredFolders: []
+	ignoredFolders: [],
+	frontmatterAttributes: []
 };
 
 export class HelloWorldPluginSettingTab extends PluginSettingTab {
@@ -124,6 +131,45 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				removeBtn.addEventListener("click", () => {
 					this.plugin.settings.ignoredFolders = 
 						this.plugin.settings.ignoredFolders.filter(f => f !== folder);
+					void this.plugin.saveSettings().then(() => {
+						this.display();
+					});
+				});
+			}
+		}
+
+		// Frontmatter attributes section
+		let fmInputEl: HTMLInputElement;
+		new Setting(containerEl)
+			.setName("Frontmatter attributes")
+			.setDesc("Add key:value pairs to index file frontmatter")
+			.addText(text => {
+				fmInputEl = text.inputEl;
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
+				text.setPlaceholder("key:value");
+			})
+			.addButton(btn => btn
+				.setButtonText("Add")
+				.onClick(async () => {
+					const value = fmInputEl.value.trim();
+					const [key, val] = value.split(":");
+					if (key && val && !this.plugin.settings.frontmatterAttributes.some(attr => attr.key === key)) {
+						this.plugin.settings.frontmatterAttributes.push({ key: key.trim(), value: val.trim() });
+						await this.plugin.saveSettings();
+						fmInputEl.value = "";
+						this.display();
+					}
+				}));
+
+		if (this.plugin.settings.frontmatterAttributes.length > 0) {
+			const fmListContainer = containerEl.createDiv("frontmatter-attributes-list");
+			for (const attr of this.plugin.settings.frontmatterAttributes) {
+				const attrEl = fmListContainer.createDiv("frontmatter-attribute-item");
+				attrEl.createSpan({ text: `${attr.key}: ${attr.value}`, cls: "frontmatter-attribute-name" });
+				const removeBtn = attrEl.createEl("button", { cls: "frontmatter-attribute-remove clickable-icon" });
+				setIcon(removeBtn, "trash-2");
+				removeBtn.addEventListener("click", () => {
+					this.plugin.settings.frontmatterAttributes = this.plugin.settings.frontmatterAttributes.filter(a => a.key !== attr.key);
 					void this.plugin.saveSettings().then(() => {
 						this.display();
 					});
