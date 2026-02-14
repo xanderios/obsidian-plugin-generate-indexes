@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
-import HelloWorldPlugin from "./main";
+import type HelloWorldPlugin from "./main";
 import { FolderSuggest } from "./ui/folderSuggest";
 
 export type SortOrder = "asc" | "desc";
@@ -11,16 +11,18 @@ export interface FrontmatterAttribute {
 
 export interface HelloWorldPluginSettings {
 	indexIdentifier: string;
-	indexDisplayFormat: string;
-	displayStripPattern: string;
-	sortEnabled: boolean;
-	sortOrder: SortOrder;
-	ignoredFolders: string[];
-	frontmatterAttributes: FrontmatterAttribute[];
+	indexFilePattern?: string;
+	indexDisplayFormat?: string;
+	displayStripPattern?: string;
+	sortEnabled?: boolean;
+	sortOrder?: SortOrder;
+	ignoredFolders?: string[];
+	frontmatterAttributes?: FrontmatterAttribute[];
 }
 
 export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
 	indexIdentifier: "^\\d{2} - ",
+	indexFilePattern: "00 - {folderName}",
 	indexDisplayFormat: "📁 {name}",
 	displayStripPattern: "^\\d{2} - ",
 	sortEnabled: true,
@@ -54,11 +56,22 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName("Index file pattern")
+			.setDesc("Pattern for new index filenames. Use {folderName} for the folder name.")
+			.addText(text => text
+				.setPlaceholder("00 - {folderName}")
+				.setValue(this.plugin.settings.indexFilePattern ?? "00 - {folderName}")
+				.onChange(async (value) => {
+					this.plugin.settings.indexFilePattern = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
 			.setName("Index display format")
 			.setDesc("How nested index links appear. Use {name} for the index name.")
 			.addText(text => text
 				.setPlaceholder("📁 {name}")
-				.setValue(this.plugin.settings.indexDisplayFormat)
+				.setValue(this.plugin.settings.indexDisplayFormat ?? "📁 {name}")
 				.onChange(async (value) => {
 					this.plugin.settings.indexDisplayFormat = value;
 					await this.plugin.saveSettings();
@@ -69,7 +82,7 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 			.setDesc("Regex pattern to strip from display names (leave empty to show full name).")
 			.addText(text => text
 				.setPlaceholder("^\\d{2} - ")
-				.setValue(this.plugin.settings.displayStripPattern)
+				.setValue(this.plugin.settings.displayStripPattern ?? "")
 				.onChange(async (value) => {
 					this.plugin.settings.displayStripPattern = value;
 					await this.plugin.saveSettings();
@@ -79,7 +92,7 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 			.setName("Sort")
 			.setDesc("Sort files in the index list")
 			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.sortEnabled)
+				.setValue(this.plugin.settings.sortEnabled ?? true)
 				.onChange(async (value) => {
 					this.plugin.settings.sortEnabled = value;
 					await this.plugin.saveSettings();
@@ -89,7 +102,7 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				.addOption("asc", "A to Z")
 				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				.addOption("desc", "Z to A")
-				.setValue(this.plugin.settings.sortOrder)
+				.setValue(this.plugin.settings.sortOrder ?? "asc")
 				.onChange(async (value) => {
 					this.plugin.settings.sortOrder = value as SortOrder;
 					await this.plugin.saveSettings();
@@ -109,8 +122,9 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				.setButtonText("Add")
 				.onClick(async () => {
 					const value = inputEl.value.trim();
-					if (value && !this.plugin.settings.ignoredFolders.includes(value)) {
-						this.plugin.settings.ignoredFolders.push(value);
+					const ignoredFolders = this.plugin.settings.ignoredFolders ?? [];
+					if (value && !ignoredFolders.includes(value)) {
+						this.plugin.settings.ignoredFolders = [...ignoredFolders, value];
 						await this.plugin.saveSettings();
 						inputEl.value = "";
 						this.display();
@@ -118,9 +132,10 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				}));
 
 		// Folder list below the setting
-		if (this.plugin.settings.ignoredFolders.length > 0) {
+		const ignoredFolders = this.plugin.settings.ignoredFolders ?? [];
+		if (ignoredFolders.length > 0) {
 			const listContainer = containerEl.createDiv("settings-item-list");
-			for (const [index, folder] of this.plugin.settings.ignoredFolders.entries()) {
+			for (const [index, folder] of ignoredFolders.entries()) {
 				const folderEl = listContainer.createDiv("settings-item-list-item");
 				
 				const textInput = folderEl.createEl("input", {
@@ -132,7 +147,9 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				textInput.addEventListener("change", () => {
 					const newVal = textInput.value.trim();
 					if (newVal) {
-						this.plugin.settings.ignoredFolders[index] = newVal;
+						const folders = this.plugin.settings.ignoredFolders ?? [];
+						folders[index] = newVal;
+						this.plugin.settings.ignoredFolders = folders;
 						void this.plugin.saveSettings();
 					}
 				});
@@ -142,8 +159,8 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				});
 				setIcon(removeBtn, "trash-2");
 				removeBtn.addEventListener("click", () => {
-					this.plugin.settings.ignoredFolders = 
-						this.plugin.settings.ignoredFolders.filter(f => f !== folder);
+					const folders = this.plugin.settings.ignoredFolders ?? [];
+					this.plugin.settings.ignoredFolders = folders.filter(f => f !== folder);
 					void this.plugin.saveSettings().then(() => {
 						this.display();
 					});
@@ -166,18 +183,20 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				.onClick(async () => {
 					const value = fmInputEl.value.trim();
 					const [key, val] = value.split(":");
-					if (key && val && !this.plugin.settings.frontmatterAttributes.some(attr => attr.key === key)) {
-						this.plugin.settings.frontmatterAttributes.push({ key: key.trim(), value: val.trim() });
+					const attributes = this.plugin.settings.frontmatterAttributes ?? [];
+					if (key && val && !attributes.some(attr => attr.key === key)) {
+						this.plugin.settings.frontmatterAttributes = [...attributes, { key: key.trim(), value: val.trim() }];
 						await this.plugin.saveSettings();
 						fmInputEl.value = "";
 						this.display();
 					}
 				}));
 
-		if (this.plugin.settings.frontmatterAttributes.length > 0) {
+		const frontmatterAttributes = this.plugin.settings.frontmatterAttributes ?? [];
+		if (frontmatterAttributes.length > 0) {
 			const fmListContainer = containerEl.createDiv("settings-item-list");
 			
-			for (const [index, attr] of this.plugin.settings.frontmatterAttributes.entries()) {
+			for (const [index, attr] of frontmatterAttributes.entries()) {
 				const attrEl = fmListContainer.createDiv("settings-item-list-item");
 				
 				const textInput = attrEl.createEl("input", {
@@ -189,10 +208,12 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 					const [newKey, ...rest] = textInput.value.split(":");
 					const newVal = rest.join(":");
 					if (newKey && newVal) {
-						this.plugin.settings.frontmatterAttributes[index] = { 
+						const attrs = this.plugin.settings.frontmatterAttributes ?? [];
+						attrs[index] = { 
 							key: newKey.trim(), 
 							value: newVal.trim() 
 						};
+						this.plugin.settings.frontmatterAttributes = attrs;
 						void this.plugin.saveSettings();
 					}
 				});
@@ -202,8 +223,8 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				});
 				setIcon(removeBtn, "trash-2");
 				removeBtn.addEventListener("click", () => {
-					this.plugin.settings.frontmatterAttributes = 
-						this.plugin.settings.frontmatterAttributes.filter(a => a.key !== attr.key);
+					const attrs = this.plugin.settings.frontmatterAttributes ?? [];
+					this.plugin.settings.frontmatterAttributes = attrs.filter(a => a.key !== attr.key);
 					void this.plugin.saveSettings().then(() => {
 						this.display();
 					});

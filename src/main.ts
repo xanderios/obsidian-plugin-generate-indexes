@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin, TFile } from "obsidian";
+import { Editor, MarkdownView, Notice, Plugin, TFile, TFolder } from "obsidian";
 import { DEFAULT_SETTINGS, HelloWorldPluginSettings, HelloWorldPluginSettingTab, FrontmatterAttribute } from "./settings";
 import { HelloWorldModal } from "./ui/modal";
 import { 
@@ -147,6 +147,89 @@ export default class HelloWorldPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Get all folders in the vault recursively.
+	 */
+	private getAllFolders(): TFolder[] {
+		const folders: TFolder[] = [];
+		const root = this.app.vault.getRoot();
+		
+		const collectFolders = (folder: TFolder) => {
+			folders.push(folder);
+			for (const child of folder.children) {
+				if (child instanceof TFolder) {
+					collectFolders(child);
+				}
+			}
+		};
+		
+		collectFolders(root);
+		return folders;
+	}
+
+	/**
+	 * Check if a folder is inside an ignored folder.
+	 */
+	private isInIgnoredFolder(folderPath: string, ignoredFolders: string[]): boolean {
+		return ignoredFolders.some(ignored => {
+			return folderPath === ignored || folderPath.startsWith(ignored + "/");
+		});
+	}
+
+	async generateIndexFilesForAllFolders(): Promise<void> {
+		const identifierPattern = this.settings.indexIdentifier;
+		const filePattern = this.settings.indexFilePattern ?? "00 - {folderName}";
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		
+		const allFolders = this.getAllFolders();
+		const existingIndexes = getIndexFiles(this.app.vault, identifierPattern, []);
+		
+		// Map folder paths to existing index files
+		const folderHasIndex = new Set<string>();
+		for (const indexFile of existingIndexes) {
+			folderHasIndex.add(getParentPath(indexFile));
+		}
+		
+		let createdCount = 0;
+		
+		for (const folder of allFolders) {
+			const folderPath = folder.path === "/" ? "" : folder.path;
+			
+			// Skip ignored folders
+			if (folderPath && this.isInIgnoredFolder(folderPath, ignoredFolders)) {
+				continue;
+			}
+			
+			// Skip if folder already has an index
+			if (folderHasIndex.has(folderPath)) {
+				continue;
+			}
+			
+			// Generate filename
+			const folderName = folder.name || "Index";
+		// Check if folder name already matches the identifier pattern
+		const nameMatchesIdentifier = new RegExp(identifierPattern).test(folderName);
+		const fileName = nameMatchesIdentifier 
+			? `${folderName}.md`
+			: `${filePattern.replace("{folderName}", folderName)}.md`;
+		const filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
+		
+		// Create the file
+			try {
+				await this.app.vault.create(filePath, "");
+				createdCount++;
+			} catch {
+				// File might already exist or other error
+			}
+		}
+		
+		if (createdCount > 0) {
+			new Notice(`Created ${createdCount} index file${createdCount > 1 ? "s" : ""}`);
+		} else {
+			new Notice("No new index files created (all folders already have indexes)");
+		}
+	}
+
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
@@ -170,6 +253,15 @@ export default class HelloWorldPlugin extends Plugin {
 			name: "Generate indexes for current folder",
 			callback: () => {
 				void this.generateIndexForCurrentFolder();
+			}
+		});
+
+		// Command: generate index files for all folders
+		this.addCommand({
+			id: "generate-index-files-all-folders",
+			name: "Generate index files for all folders",
+			callback: () => {
+				void this.generateIndexFilesForAllFolders();
 			}
 		});
 
