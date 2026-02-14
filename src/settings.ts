@@ -119,13 +119,25 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 
 		// Folder list below the setting
 		if (this.plugin.settings.ignoredFolders.length > 0) {
-			const listContainer = containerEl.createDiv("ignored-folders-list");
-			for (const folder of this.plugin.settings.ignoredFolders) {
-				const folderEl = listContainer.createDiv("ignored-folder-item");
-				folderEl.createSpan({ text: folder, cls: "ignored-folder-name" });
+			const listContainer = containerEl.createDiv("settings-item-list");
+			for (const [index, folder] of this.plugin.settings.ignoredFolders.entries()) {
+				const folderEl = listContainer.createDiv("settings-item-list-item");
+				
+				const textInput = folderEl.createEl("input", {
+					type: "text",
+					cls: "settings-item-list-input",
+					value: folder
+				});
+				textInput.addEventListener("change", () => {
+					const newVal = textInput.value.trim();
+					if (newVal) {
+						this.plugin.settings.ignoredFolders[index] = newVal;
+						void this.plugin.saveSettings();
+					}
+				});
 				
 				const removeBtn = folderEl.createEl("button", { 
-					cls: "ignored-folder-remove clickable-icon" 
+					cls: "mod-warning" 
 				});
 				setIcon(removeBtn, "trash-2");
 				removeBtn.addEventListener("click", () => {
@@ -162,14 +174,35 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				}));
 
 		if (this.plugin.settings.frontmatterAttributes.length > 0) {
-			const fmListContainer = containerEl.createDiv("frontmatter-attributes-list");
-			for (const attr of this.plugin.settings.frontmatterAttributes) {
-				const attrEl = fmListContainer.createDiv("frontmatter-attribute-item");
-				attrEl.createSpan({ text: `${attr.key}: ${attr.value}`, cls: "frontmatter-attribute-name" });
-				const removeBtn = attrEl.createEl("button", { cls: "frontmatter-attribute-remove clickable-icon" });
+			const fmListContainer = containerEl.createDiv("settings-item-list");
+			
+			for (const [index, attr] of this.plugin.settings.frontmatterAttributes.entries()) {
+				const attrEl = fmListContainer.createDiv("settings-item-list-item");
+				
+				const textInput = attrEl.createEl("input", {
+					type: "text",
+					cls: "settings-item-list-input",
+					value: `${attr.key}:${attr.value}`
+				});
+				textInput.addEventListener("change", () => {
+					const [newKey, ...rest] = textInput.value.split(":");
+					const newVal = rest.join(":");
+					if (newKey && newVal) {
+						this.plugin.settings.frontmatterAttributes[index] = { 
+							key: newKey.trim(), 
+							value: newVal.trim() 
+						};
+						void this.plugin.saveSettings();
+					}
+				});
+
+				const removeBtn = attrEl.createEl("button", { 
+					cls: "mod-warning" 
+				});
 				setIcon(removeBtn, "trash-2");
 				removeBtn.addEventListener("click", () => {
-					this.plugin.settings.frontmatterAttributes = this.plugin.settings.frontmatterAttributes.filter(a => a.key !== attr.key);
+					this.plugin.settings.frontmatterAttributes = 
+						this.plugin.settings.frontmatterAttributes.filter(a => a.key !== attr.key);
 					void this.plugin.saveSettings().then(() => {
 						this.display();
 					});

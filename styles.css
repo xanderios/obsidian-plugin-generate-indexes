@@ -1,35 +1,57 @@
 /*
-  Styles for the Index Generator plugin settings
+Styles for the Index Generator plugin settings
 */
 
-/* Ignored folders list */
-.ignored-folders-list {
-	margin-top: -24px;
-	margin-bottom: 16px;
+/*
+Reference for Obsidian CSS Variables:
+https://docs.obsidian.md/Reference/CSS+variables/CSS+variables
+*/
+
+/* Reusable settings item list */
+.settings-item-list {
+	margin-top: calc(var(--size-4-6) * -1);
+	margin-bottom: var(--size-4-4);
 	display: flex;
 	flex-direction: column;
 	background: var(--color-base-10);
-	padding-top: 24px;
+	padding: var(--size-4-6) 0 var(--size-4-2);
 	border-radius: var(--radius-l);
-	gap: 6px;
+	gap: var(--size-4-2);
 }
 
-.ignored-folder-item {
+.settings-item-list-item {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	gap: 12px;
-	padding: 6px 10px;
-	border-radius: var(--radius-s);
-	font-size: 13px;
+	gap: var(--size-4-3);
+	padding: var(--size-4-2) var(--size-4-3);
+	font-size: var(--font-ui-small);
 }
 
-.ignored-folder-name {
+.settings-item-list-name {
 	color: var(--text-normal);
+	padding: var(--size-4-2);
+	background: var(--color-base-25);
+	border-radius: var(--radius-m);
 	flex: 1;
 }
 
-.ignored-folder-remove {
+.settings-item-list-input {
+	width: 300px;
+	padding: var(--size-4-2);
+	background: var(--color-base-25);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+}
+
+.settings-item-list-input:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+}
+
+.settings-item-list-remove {
 	background: none;
 	border: none;
 	color: var(--text-error);
@@ -41,7 +63,7 @@
 	justify-content: center;
 }
 
-.ignored-folder-remove:hover {
+.settings-item-list-remove:hover {
 	background: var(--background-modifier-error);
 	color: var(--text-on-accent);
 }
