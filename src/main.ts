@@ -354,6 +354,14 @@ export default class HelloWorldPlugin extends Plugin {
 		const oldParentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "";
 		const newParentPath = file.path.substring(0, file.path.lastIndexOf("/")) || "";
 		
+		// Small delay to ensure vault has updated paths
+		await new Promise(resolve => setTimeout(resolve, 50));
+		
+		// For folder renames, rename the index file inside to match new folder name
+		if (file instanceof TFolder) {
+			await this.renameIndexFileInFolder(file, oldPath);
+		}
+		
 		// Update old parent's index (if not ignored)
 		if (!oldParentPath || !this.isInIgnoredFolder(oldParentPath, ignoredFolders)) {
 			await this.updateIndexInFolder(oldParentPath);
@@ -364,6 +372,45 @@ export default class HelloWorldPlugin extends Plugin {
 			if (!newParentPath || !this.isInIgnoredFolder(newParentPath, ignoredFolders)) {
 				await this.updateIndexInFolder(newParentPath);
 			}
+		}
+	}
+
+	/**
+	 * Rename the index file inside a folder to match the new folder name.
+	 */
+	private async renameIndexFileInFolder(folder: TFolder, oldFolderPath: string): Promise<void> {
+		const identifierPattern = this.settings.indexIdentifier;
+		const filePattern = this.settings.indexFilePattern ?? "00 - {folderName}";
+		const indexFiles = getIndexFiles(this.app.vault, identifierPattern, []);
+		
+		// Find index file in this folder
+		const indexInFolder = indexFiles.find(f => getParentPath(f) === folder.path);
+		if (!indexInFolder) return;
+		
+		// Get old and new folder names
+		const oldFolderName = oldFolderPath.substring(oldFolderPath.lastIndexOf("/") + 1) || "Index";
+		const newFolderName = folder.name || "Index";
+		
+		// Build expected old and new filenames based on pattern
+		const expectedOldName = filePattern.replace("{folderName}", oldFolderName) + ".md";
+		const expectedNewName = filePattern.replace("{folderName}", newFolderName) + ".md";
+		
+		// Only rename if the current filename matches the old pattern
+		if (indexInFolder.name !== expectedOldName) return;
+		
+		// Skip if new filename is the same
+		if (expectedOldName === expectedNewName) return;
+		
+		// Check if new filename already exists
+		const newFilePath = `${folder.path}/${expectedNewName}`;
+		const existingFile = this.app.vault.getAbstractFileByPath(newFilePath);
+		if (existingFile) return; // Skip if conflict
+		
+		// Rename the index file
+		try {
+			await this.app.vault.rename(indexInFolder, newFilePath);
+		} catch {
+			// Rename failed, ignore
 		}
 	}
 
