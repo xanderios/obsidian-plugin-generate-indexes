@@ -10,6 +10,7 @@ export interface FrontmatterAttribute {
 }
 
 export interface HelloWorldPluginSettings {
+	autoUpdateIndexes?: boolean;
 	indexIdentifier: string;
 	indexFilePattern?: string;
 	indexDisplayFormat?: string;
@@ -21,6 +22,7 @@ export interface HelloWorldPluginSettings {
 }
 
 export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
+	autoUpdateIndexes: true,
 	indexIdentifier: "^\\d{2} - ",
 	indexFilePattern: "00 - {folderName}",
 	indexDisplayFormat: "📁 {name}",
@@ -43,6 +45,16 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName("Auto-update indexes")
+			.setDesc("Automatically update indexes when files or folders are created, deleted, or renamed")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoUpdateIndexes ?? true)
+				.onChange(async (value) => {
+					this.plugin.settings.autoUpdateIndexes = value;
+					await this.plugin.saveSettings();
+				}));
 
 		new Setting(containerEl)
 			.setName("Index identifier")

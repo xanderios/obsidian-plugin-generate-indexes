@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin, TFile, TFolder } from "obsidian";
+import { Editor, MarkdownView, Notice, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
 import { DEFAULT_SETTINGS, HelloWorldPluginSettings, HelloWorldPluginSettingTab, FrontmatterAttribute } from "./settings";
 import { HelloWorldModal } from "./ui/modal";
 import { 
@@ -285,6 +285,124 @@ export default class HelloWorldPlugin extends Plugin {
 
 		// Settings tab
 		this.addSettingTab(new HelloWorldPluginSettingTab(this.app, this));
+
+		// Register vault events for auto-updating indexes
+		this.registerEvent(
+			this.app.vault.on("create", (file: TAbstractFile) => {
+				void this.handleFileCreate(file);
+			})
+		);
+
+		this.registerEvent(
+			this.app.vault.on("delete", (file: TAbstractFile) => {
+				void this.handleFileDelete(file);
+			})
+		);
+
+		this.registerEvent(
+			this.app.vault.on("rename", (file: TAbstractFile, oldPath: string) => {
+				void this.handleFileRename(file, oldPath);
+			})
+		);
+	}
+
+	/**
+	 * Handle file/folder creation event.
+	 */
+	private async handleFileCreate(file: TAbstractFile): Promise<void> {
+		if (!(this.settings.autoUpdateIndexes ?? true)) return;
+		
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		const parentPath = file.path.substring(0, file.path.lastIndexOf("/")) || "";
+		
+		// Skip if in ignored folder
+		if (parentPath && this.isInIgnoredFolder(parentPath, ignoredFolders)) return;
+		
+		if (file instanceof TFolder) {
+			// Folder created: create index file for it, then update parent's index
+			await this.createIndexFileForFolder(file);
+			await this.updateIndexInFolder(parentPath);
+		} else if (file instanceof TFile && file.extension === "md") {
+			// Markdown file created: update parent folder's index
+			await this.updateIndexInFolder(parentPath);
+		}
+	}
+
+	/**
+	 * Handle file/folder deletion event.
+	 */
+	private async handleFileDelete(file: TAbstractFile): Promise<void> {
+		if (!(this.settings.autoUpdateIndexes ?? true)) return;
+		
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		const parentPath = file.path.substring(0, file.path.lastIndexOf("/")) || "";
+		
+		// Skip if in ignored folder
+		if (parentPath && this.isInIgnoredFolder(parentPath, ignoredFolders)) return;
+		
+		// Update parent folder's index
+		await this.updateIndexInFolder(parentPath);
+	}
+
+	/**
+	 * Handle file/folder rename event.
+	 */
+	private async handleFileRename(file: TAbstractFile, oldPath: string): Promise<void> {
+		if (!(this.settings.autoUpdateIndexes ?? true)) return;
+		
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		const oldParentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "";
+		const newParentPath = file.path.substring(0, file.path.lastIndexOf("/")) || "";
+		
+		// Update old parent's index (if not ignored)
+		if (!oldParentPath || !this.isInIgnoredFolder(oldParentPath, ignoredFolders)) {
+			await this.updateIndexInFolder(oldParentPath);
+		}
+		
+		// Update new parent's index (if different and not ignored)
+		if (newParentPath !== oldParentPath) {
+			if (!newParentPath || !this.isInIgnoredFolder(newParentPath, ignoredFolders)) {
+				await this.updateIndexInFolder(newParentPath);
+			}
+		}
+	}
+
+	/**
+	 * Create an index file for a specific folder.
+	 */
+	private async createIndexFileForFolder(folder: TFolder): Promise<void> {
+		const identifierPattern = this.settings.indexIdentifier;
+		const filePattern = this.settings.indexFilePattern ?? "00 - {folderName}";
+		const existingIndexes = getIndexFiles(this.app.vault, identifierPattern, []);
+		
+		// Check if folder already has an index
+		const folderHasIndex = existingIndexes.some(f => getParentPath(f) === folder.path);
+		if (folderHasIndex) return;
+		
+		// Generate filename
+		const folderName = folder.name || "Index";
+		const fileName = filePattern.replace("{folderName}", folderName) + ".md";
+		const filePath = `${folder.path}/${fileName}`;
+		
+		try {
+			await this.app.vault.create(filePath, "");
+		} catch {
+			// File might already exist
+		}
+	}
+
+	/**
+	 * Update the index file in a specific folder.
+	 */
+	private async updateIndexInFolder(folderPath: string): Promise<void> {
+		const identifierPattern = this.settings.indexIdentifier;
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		const indexFiles = getIndexFiles(this.app.vault, identifierPattern, ignoredFolders);
+		
+		const indexInFolder = indexFiles.find(f => getParentPath(f) === folderPath);
+		if (indexInFolder) {
+			await this.updateIndexFile(indexInFolder);
+		}
 	}
 
 	onunload(): void {
