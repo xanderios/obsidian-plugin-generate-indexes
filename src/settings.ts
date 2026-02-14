@@ -128,6 +128,7 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 					cls: "settings-item-list-input",
 					value: folder
 				});
+				new FolderSuggest(this.app, textInput);
 				textInput.addEventListener("change", () => {
 					const newVal = textInput.value.trim();
 					if (newVal) {
