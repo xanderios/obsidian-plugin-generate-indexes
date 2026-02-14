@@ -315,8 +315,9 @@ export default class HelloWorldPlugin extends Plugin {
 		const ignoredFolders = this.settings.ignoredFolders ?? [];
 		const parentPath = file.path.substring(0, file.path.lastIndexOf("/")) || "";
 		
-		// Skip if in ignored folder
+		// Skip if in ignored folder (check parent path for files, or folder itself for folders)
 		if (parentPath && this.isInIgnoredFolder(parentPath, ignoredFolders)) return;
+		if (file instanceof TFolder && this.isInIgnoredFolder(file.path, ignoredFolders)) return;
 		
 		if (file instanceof TFolder) {
 			// Folder created: create index file for it, then update parent's index
@@ -420,6 +421,11 @@ export default class HelloWorldPlugin extends Plugin {
 	private async createIndexFileForFolder(folder: TFolder): Promise<void> {
 		const identifierPattern = this.settings.indexIdentifier;
 		const filePattern = this.settings.indexFilePattern ?? "00 - {folderName}";
+		const ignoredFolders = this.settings.ignoredFolders ?? [];
+		
+		// Skip if folder is in ignored list
+		if (this.isInIgnoredFolder(folder.path, ignoredFolders)) return;
+		
 		const existingIndexes = getIndexFiles(this.app.vault, identifierPattern, []);
 		
 		// Check if folder already has an index
@@ -428,7 +434,11 @@ export default class HelloWorldPlugin extends Plugin {
 		
 		// Generate filename
 		const folderName = folder.name || "Index";
-		const fileName = filePattern.replace("{folderName}", folderName) + ".md";
+		// Check if folder name already matches the identifier pattern
+		const nameMatchesIdentifier = new RegExp(identifierPattern).test(folderName);
+		const fileName = nameMatchesIdentifier 
+			? `${folderName}.md`
+			: `${filePattern.replace("{folderName}", folderName)}.md`;
 		const filePath = `${folder.path}/${fileName}`;
 		
 		try {
