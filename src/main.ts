@@ -22,24 +22,23 @@ export default class HelloWorldPlugin extends Plugin {
 	 * Returns true if the file was updated, false if unchanged.
 	 */
 	private async updateIndexFile(indexFile: TFile): Promise<boolean> {
-		const prefix = this.settings.indexPrefix;
+		const identifierPattern = this.settings.indexIdentifier;
 		const sortOrder = this.settings.sortOrder ?? "asc";
 		const displayFormat = this.settings.indexDisplayFormat ?? "📁 {name}";
-		const stripPrefix = this.settings.stripPrefix ?? true;
+		const displayStripPattern = this.settings.displayStripPattern ?? "";
 		const ignoredFolders = this.settings.ignoredFolders ?? [];
 
 		// Gather files for this index
-		const siblings = getSiblingFiles(this.app.vault, indexFile, prefix, ignoredFolders);
-		const nestedIndexes = getNestedIndexFiles(this.app.vault, indexFile, prefix, ignoredFolders);
+		const siblings = getSiblingFiles(this.app.vault, indexFile, identifierPattern, ignoredFolders);
+		const nestedIndexes = getNestedIndexFiles(this.app.vault, indexFile, identifierPattern, ignoredFolders);
 
 		// Generate new list content
 		const newListContent = generateListContent(
 			siblings, 
 			nestedIndexes, 
 			sortOrder, 
-			prefix, 
-			displayFormat,
-			stripPrefix
+			displayStripPattern, 
+			displayFormat
 		);
 		const newHash = computeContentHash(newListContent);
 
@@ -63,12 +62,12 @@ export default class HelloWorldPlugin extends Plugin {
 	 * Generate indexes for all index files in the vault.
 	 */
 	async generateIndexesForVault(): Promise<void> {
-		const prefix = this.settings.indexPrefix;
+		const identifierPattern = this.settings.indexIdentifier;
 		const ignoredFolders = this.settings.ignoredFolders ?? [];
-		const indexFiles = getIndexFiles(this.app.vault, prefix, ignoredFolders);
+		const indexFiles = getIndexFiles(this.app.vault, identifierPattern, ignoredFolders);
 
 		if (indexFiles.length === 0) {
-			new Notice(`No index files found with prefix "${prefix}"`);
+			new Notice(`No index files found matching pattern "${identifierPattern}"`);
 			return;
 		}
 
@@ -96,16 +95,16 @@ export default class HelloWorldPlugin extends Plugin {
 			return;
 		}
 
-		const prefix = this.settings.indexPrefix;
+		const identifierPattern = this.settings.indexIdentifier;
 		const currentFolder = getParentPath(activeFile);
 		const ignoredFolders = this.settings.ignoredFolders ?? [];
 
 		// Find index file in current folder
-		const indexFiles = getIndexFiles(this.app.vault, prefix, ignoredFolders);
+		const indexFiles = getIndexFiles(this.app.vault, identifierPattern, ignoredFolders);
 		const indexInFolder = indexFiles.find(f => getParentPath(f) === currentFolder);
 
 		if (!indexInFolder) {
-			new Notice(`No index file found in current folder with prefix "${prefix}"`);
+			new Notice(`No index file found in current folder matching pattern "${identifierPattern}"`);
 			return;
 		}
 

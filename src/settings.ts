@@ -5,17 +5,17 @@ import { FolderSuggest } from "./ui/folderSuggest";
 export type SortOrder = "asc" | "desc";
 
 export interface HelloWorldPluginSettings {
-	indexPrefix: string;
+	indexIdentifier: string;
 	indexDisplayFormat: string;
-	stripPrefix: boolean;
+	displayStripPattern: string;
 	sortOrder: SortOrder;
 	ignoredFolders: string[];
 }
 
 export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
-	indexPrefix: "Index - ",
+	indexIdentifier: "^\\d{2} - ",
 	indexDisplayFormat: "📁 {name}",
-	stripPrefix: true,
+	displayStripPattern: "^\\d{2} - ",
 	sortOrder: "asc",
 	ignoredFolders: []
 };
@@ -34,13 +34,13 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName("Index prefix")
-			.setDesc("Files starting with this prefix are treated as index files")
+			.setName("Index identifier")
+			.setDesc("Regex pattern to identify index files (e.g., ^\\d{2} - matches '01 - ').")
 			.addText(text => text
-				.setPlaceholder("Index - ")
-				.setValue(this.plugin.settings.indexPrefix)
+				.setPlaceholder("^\\d{2} - ")
+				.setValue(this.plugin.settings.indexIdentifier)
 				.onChange(async (value) => {
-					this.plugin.settings.indexPrefix = value;
+					this.plugin.settings.indexIdentifier = value;
 					await this.plugin.saveSettings();
 				}));
 
@@ -56,12 +56,13 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName("Strip prefix")
-			.setDesc("Remove the index prefix from nested index display names")
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.stripPrefix)
+			.setName("Display strip pattern")
+			.setDesc("Regex pattern to strip from display names (leave empty to show full name).")
+			.addText(text => text
+				.setPlaceholder("^\\d{2} - ")
+				.setValue(this.plugin.settings.displayStripPattern)
 				.onChange(async (value) => {
-					this.plugin.settings.stripPrefix = value;
+					this.plugin.settings.displayStripPattern = value;
 					await this.plugin.saveSettings();
 				}));
 
