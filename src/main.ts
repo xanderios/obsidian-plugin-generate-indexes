@@ -23,6 +23,7 @@ export default class HelloWorldPlugin extends Plugin {
 	 */
 	private async updateIndexFile(indexFile: TFile): Promise<boolean> {
 		const identifierPattern = this.settings.indexIdentifier;
+		const sortEnabled = this.settings.sortEnabled ?? true;
 		const sortOrder = this.settings.sortOrder ?? "asc";
 		const displayFormat = this.settings.indexDisplayFormat ?? "📁 {name}";
 		const displayStripPattern = this.settings.displayStripPattern ?? "";
@@ -36,6 +37,7 @@ export default class HelloWorldPlugin extends Plugin {
 		const newListContent = generateListContent(
 			siblings, 
 			nestedIndexes, 
+			sortEnabled,
 			sortOrder, 
 			displayStripPattern, 
 			displayFormat

@@ -150,18 +150,19 @@ function sortFiles(files: TFile[], sortOrder: SortOrder): TFile[] {
 
 /**
  * Generate the numbered list content with wiki links.
- * Nested indexes come first, then siblings. Both groups are sorted.
+ * Nested indexes come first, then siblings. Both groups are sorted if enabled.
  */
 export function generateListContent(
 	siblings: TFile[], 
 	nestedIndexes: TFile[],
+	sortEnabled: boolean,
 	sortOrder: SortOrder,
 	displayStripPattern: string,
 	indexDisplayFormat: string
 ): string {
-	// Sort each group separately
-	const sortedNested = sortFiles(nestedIndexes, sortOrder);
-	const sortedSiblings = sortFiles(siblings, sortOrder);
+	// Sort each group separately if sorting is enabled
+	const sortedNested = sortEnabled ? sortFiles(nestedIndexes, sortOrder) : nestedIndexes;
+	const sortedSiblings = sortEnabled ? sortFiles(siblings, sortOrder) : siblings;
 	
 	// Nested indexes first, then siblings
 	const allItems = [...sortedNested, ...sortedSiblings];

@@ -8,6 +8,7 @@ export interface HelloWorldPluginSettings {
 	indexIdentifier: string;
 	indexDisplayFormat: string;
 	displayStripPattern: string;
+	sortEnabled: boolean;
 	sortOrder: SortOrder;
 	ignoredFolders: string[];
 }
@@ -16,6 +17,7 @@ export const DEFAULT_SETTINGS: HelloWorldPluginSettings = {
 	indexIdentifier: "^\\d{2} - ",
 	indexDisplayFormat: "📁 {name}",
 	displayStripPattern: "^\\d{2} - ",
+	sortEnabled: true,
 	sortOrder: "asc",
 	ignoredFolders: []
 };
@@ -67,8 +69,14 @@ export class HelloWorldPluginSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName("Sort order")
-			.setDesc("How to sort files in the index list")
+			.setName("Sort")
+			.setDesc("Sort files in the index list")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.sortEnabled)
+				.onChange(async (value) => {
+					this.plugin.settings.sortEnabled = value;
+					await this.plugin.saveSettings();
+				}))
 			.addDropdown(dropdown => dropdown
 				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				.addOption("asc", "A to Z")
